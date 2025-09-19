@@ -24,12 +24,12 @@ export class FollowerDetector {
    */
   public async initialize(): Promise<void> {
     console.log('🚀 Initializing follower detector...');
-    
+
 
     // Get initial friends list
     const initialFriends = await this.getFriendsList();
     this.dataStorage.setInitialFriends(initialFriends);
-    
+
     console.log('✅ Follower detector initialized');
   }
 
@@ -51,9 +51,9 @@ export class FollowerDetector {
 
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
-      
+
       console.log(`\n👤 Processing user ${i + 1}/${users.length}: ${user.name} (${user.id})`);
-      
+
       // Skip if it's an initial friend (don't want to unfollow real friends)
       if (this.dataStorage.isInitialFriend(user.id)) {
         console.log('⏭️ Skipping initial friend');
@@ -62,13 +62,13 @@ export class FollowerDetector {
 
       try {
         await this.checkIfFollowsBack(user);
-        
+
         // Wait between requests to avoid rate limiting
         if (i < users.length - 1) {
           console.log('⏳ Waiting before next user...');
           await waitFor(3); // 3 seconds between requests
         }
-        
+
       } catch (error) {
         console.error(`❌ Error processing user ${user.name}:`, error);
         continue;
@@ -100,30 +100,15 @@ export class FollowerDetector {
     };
 
     try {
-      // Step 1: Navigate to user's profile or find them in current view
-      console.log(`🌐 Looking for ${user.name} to follow...`);
-      
-      // Try to go to their profile first
-      const profileSuccess = await this.uiController.goToUserProfile(user.id);
-      
-      if (!profileSuccess) {
-        console.log(`⚠️ Couldn't navigate to ${user.name}'s profile, trying to find them on current page`);
-      }
 
-      // Step 2: Click follow button
       console.log(`👆 Clicking follow button for ${user.name}...`);
-      const followSuccess = await this.uiController.clickFollowUser(user.name);
-      
-      if (!followSuccess) {
-        console.error(`❌ Failed to click follow for ${user.name}`);
-        result.followSuccess = false;
-        this.dataStorage.addDetectedFollower(result);
-        return;
-      }
-      
+      await this.uiController.clickFollowUser();
+
+
+
       result.followSuccess = true;
       console.log(`✅ Successfully clicked follow for ${user.name}`);
-      
+
       // Wait a bit for the follow to process
       await waitFor(3);
 
@@ -134,7 +119,7 @@ export class FollowerDetector {
 
       // Step 4: Check if user is now in friends list (means they follow back)
       const isNowFriend = currentFriends.includes(user.id);
-      
+
       if (isNowFriend) {
         result.followsYouBack = true;
         console.log(`🎉 ${user.name} follows you back!`);
@@ -145,7 +130,7 @@ export class FollowerDetector {
       // Step 5: ALWAYS try to unfollow (critical for staying under 100 follows limit)
       console.log(`👆 Clicking unfollow button for ${user.name}...`);
       const unfollowSuccess = await this.uiController.clickUnfollowUser(user.name);
-      
+
       if (unfollowSuccess) {
         result.unfollowSuccess = true;
         console.log(`✅ Successfully unfollowed ${user.name}`);
@@ -153,7 +138,7 @@ export class FollowerDetector {
       } else {
         result.unfollowSuccess = false;
         console.error(`❌ CRITICAL: Failed to unfollow ${user.name} via UI`);
-        
+
         // Track failed unfollow separately for manual cleanup
         this.dataStorage.addFailedUnfollow({
           userId: user.id,
@@ -193,14 +178,14 @@ export class FollowerDetector {
         },
         body: JSON.stringify(body)
       });
-      
+
       let responseData;
       try {
         responseData = await response.json();
       } catch (jsonError) {
         responseData = await response.text();
       }
-      
+
       return {
         status: response.status,
         statusText: response.statusText,
@@ -239,14 +224,14 @@ export class FollowerDetector {
         },
         body: JSON.stringify(body)
       });
-      
+
       let responseData;
       try {
         responseData = await response.json();
       } catch (jsonError) {
         responseData = await response.text();
       }
-      
+
       return {
         status: response.status,
         statusText: response.statusText,
@@ -291,7 +276,7 @@ export class FollowerDetector {
         },
         body: JSON.stringify(body)
       });
-      
+
       return {
         status: response.status,
         data: await response.json()
@@ -307,7 +292,7 @@ export class FollowerDetector {
 
     const friendIds = response.data.data?.friends || [];
     console.log(`📊 Current friends count: ${friendIds.length}`);
-    
+
     return friendIds;
   }
 

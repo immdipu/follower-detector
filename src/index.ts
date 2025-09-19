@@ -22,11 +22,11 @@ async function main() {
     await login.performLogin();
     console.log('✅ Login successful!');
     waitFor(4);
-
     await uiController.openUserProfile(loginOptions.modelUser || "");
+    waitFor(4);
+    await uiController.clickFollowUser();
   
 
-    // Keep browser open for review
     console.log('\n🌐 Browser is open. Press Ctrl+C to exit...');
     process.stdin.setRawMode(true);
     process.stdin.resume();
@@ -37,7 +37,6 @@ async function main() {
   } catch (error) {
     console.error('❌ Error:', error);
   } finally {
-    // Cleanup will happen on process exit
     process.on('exit', async () => {
       await login.close();
       await closeBrowser(browser as Browser);
