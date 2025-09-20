@@ -2,25 +2,21 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   FollowerDetectionResult,
-  Participant,
-  FailedUnfollowUser,
   DetectedFollower,
 } from "./types";
 
 export class DataStorage {
-  private baseFileName: string;
   private initialFriendsFile: string;
   private currentFriendsFile: string;
   private followersFile: string;
   private completedUsersFile: string;
 
-  constructor(baseFileName: string = "follower-data") {
-    this.baseFileName = baseFileName;
+  constructor() {
     this.initialFriendsFile = path.resolve(
-      `./${baseFileName}-initial-friends.json`
+      `./initial-friends.json`
     );
-    this.currentFriendsFile = path.resolve(`./${baseFileName}-friends.json`);
-    this.followersFile = path.resolve(`./${baseFileName}-followers.json`);
+    this.currentFriendsFile = path.resolve(`./friends.json`);
+    this.followersFile = path.resolve(`./followers.json`);
     this.completedUsersFile = path.resolve(`./completed-users.json`);
   }
 
@@ -69,56 +65,37 @@ export class DataStorage {
    * Add detected follower (only save if they follow back)
    */
   public addDetectedFollower(result: FollowerDetectionResult): void {
-    // Only save followers who actually follow back
     if (result.followsYouBack) {
       try {
-        let followers: DetectedFollower[] = [];
-
-        // Load existing followers
-        if (fs.existsSync(this.followersFile)) {
-          const fileContent = fs.readFileSync(this.followersFile, "utf-8");
-          followers = JSON.parse(fileContent);
-        }
-
-        // Check if already exists
+        const followers = this.getDetectedFollowers();
         const exists = followers.some((f) => f.userId === result.userId);
-        if (!exists) {
-          const follower: DetectedFollower = {
-            userId: result.userId,
-            username: result.username,
-            avatar: result.avatar,
-            followers: result.followers,
-            following: result.following,
-            friends: result.friends,
-            supporter: result.supporter,
-            isVerified: result.isVerified,
-            detectedAt: result.timestamp,
-          };
+        if (exists) return;
 
-          followers.push(follower);
-          fs.writeFileSync(
-            this.followersFile,
-            JSON.stringify(followers, null, 2)
-          );
-          console.log(`🎉 New follower detected: ${result.username}`);
-        } else {
-          console.log(`⚠️ Follower already exists: ${result.username}`);
-        }
+        const follower: DetectedFollower = {
+          userId: result.userId,
+          username: result.username,
+          avatar: result.avatar,
+          followers: result.followers,
+          following: result.following,
+          friends: result.friends,
+          supporter: result.supporter,
+          isVerified: result.isVerified,
+          detectedAt: result.timestamp,
+        };
+
+        followers.push(follower);
+        fs.writeFileSync(
+          this.followersFile,
+          JSON.stringify(followers, null, 2)
+        );
+
+        console.log(`🎉 New follower detected: ${result.username}`);
       } catch (error) {
-        console.error("❌ Error saving detected follower:", error);
+        console.log("❌ Error saving detected follower:", error);
       }
-    } else {
-      console.log(`❌ ${result.username} does not follow back - not saved`);
     }
   }
 
-  /**
-   * Add failed unfollow user (for debugging purposes)
-   */
-  public addFailedUnfollow(user: FailedUnfollowUser): void {
-    console.log(`⚠️ Failed unfollow: ${user.username} - ${user.error}`);
-    // We could save this to a separate file if needed, but keeping it simple for now
-  }
 
   /**
    * Get all detected followers (who follow back)
