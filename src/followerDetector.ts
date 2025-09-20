@@ -7,6 +7,7 @@ import { UIController } from "./uiController";
 import { FollowEventSystem } from "./eventSystem";
 import { APIInterceptor } from "./apiInterceptor";
 import { EventEmitter } from "stream";
+import { loginOptions } from "./config";
 
 export class FollowerDetector extends EventEmitter {
   private dataStorage: DataStorage;
@@ -43,11 +44,10 @@ export class FollowerDetector extends EventEmitter {
     this.eventSystem.onFriendsListReceived((friends: string[]) => {
       this.dataStorage.updateCurrentFriends(friends);
     });
-    
+
     this.eventSystem.onUnfollowCompleted((userId: string, success: boolean) => {
       console.log(
-        `${success ? "✅" : "❌"} Unfollow ${
-          success ? "completed" : "failed"
+        `${success ? "✅" : "❌"} Unfollow ${success ? "completed" : "failed"
         } for ${userId}`
       );
     });
@@ -85,14 +85,13 @@ export class FollowerDetector extends EventEmitter {
       }
 
       console.log(
-        `\n👤 Processing user ${i + 1}/${users.length}: ${user.name} (${
-          user.id
+        `\n👤 Processing user ${i + 1}/${users.length}: ${user.name} (${user.id
         })`
       );
 
       try {
         await this.checkIfFollowsBack(user);
-  
+
         // Wait between requests to avoid rate limiting
         if (i < users.length - 1) {
           console.log("⏳ Waiting before next user...");
@@ -115,10 +114,9 @@ export class FollowerDetector extends EventEmitter {
       `📊 Summary: ${summary.totalFollowers} followers detected, ${summary.currentFriends} current friends`
     );
     console.log(
-      `📁 Results saved to: ${
-        this.dataStorage.getDetectedFollowers().length > 0
-          ? "follower-data-followers.json"
-          : "No followers found"
+      `📁 Results saved to: ${this.dataStorage.getDetectedFollowers().length > 0
+        ? "follower-data-followers.json"
+        : "No followers found"
       }`
     );
     console.log(`📋 Friends list saved to: follower-data-friends.json`);
@@ -165,7 +163,10 @@ export class FollowerDetector extends EventEmitter {
         result.followSuccess = followSuccess;
 
         if (followSuccess) {
+          if (loginOptions.DEBUG_MODE) {
           console.log(`✅ Follow request completed for ${user.name}`);
+          }
+          
         } else {
           console.log(`❌ Follow request failed for ${user.name}`);
         }
@@ -202,14 +203,16 @@ export class FollowerDetector extends EventEmitter {
 
         // Set action to unfollow for interception (this is important for the interceptor to know that we are unfollowing)
         APIInterceptor.Action = "unfollow";
-        
+
         const unfollowClicked = await this.uiController.clickFollowUser();
         if (unfollowClicked) {
           try {
             const unfollowSuccess = await unfollowPromise;
             result.unfollowSuccess = unfollowSuccess;
             if (unfollowSuccess) {
-              console.log(`✅ Successfully unfollowed ${user.name}`);
+              if (loginOptions.DEBUG_MODE) {
+                console.log(`✅ Successfully unfollowed ${user.name}`);
+              }
             } else {
               console.log(`❌ Unfollow request failed for ${user.name}`);
             }
@@ -241,12 +244,9 @@ export class FollowerDetector extends EventEmitter {
     userId: string,
     username: string
   ): Promise<boolean> {
-    console.log(
-      `🔄 Setting up follow completion listener for ${userId} (${username})`
-    );
     return new Promise((resolve, reject) => {
       let listenerRemoved = false;
-      
+
       const timeout = setTimeout(() => {
         if (!listenerRemoved) {
           // Remove the listener to prevent memory leaks
@@ -261,22 +261,16 @@ export class FollowerDetector extends EventEmitter {
       }, 10000); // 10 second timeout
 
       const handleFollowCompleted = (completedUserId: string, success: boolean) => {
-        console.log("🎯 Follow completion event received", {
-          completedUserId,
-          success,
-          userId,
-          username,
-        });
         if (completedUserId === userId && !listenerRemoved) {
           clearTimeout(timeout);
           // Remove the listener immediately after use
           this.eventSystem.removeListener('follow-completed', handleFollowCompleted);
           listenerRemoved = true;
-          
+
           if (success) {
-            console.log(
-              `✅ Follow completion confirmed for ${userId} (${username})`
-            );
+            if (loginOptions.DEBUG_MODE) {
+              console.log(`📣 Debug: Follow completed event received for ${userId} (${username}) with success: ${success}`);
+            }
           } else {
             console.log(
               `❌ Follow completion failed for ${userId} (${username})`
@@ -304,7 +298,7 @@ export class FollowerDetector extends EventEmitter {
           listenerRemoved = true;
         }
         reject(new Error(`Unfollow completion timeout for user ${userId}`));
-      }, 10000); 
+      }, 10000);
 
       const handleUnfollowCompleted = (completedUserId: string, success: boolean) => {
         if (completedUserId === userId && !listenerRemoved) {
@@ -312,7 +306,9 @@ export class FollowerDetector extends EventEmitter {
           this.eventSystem.removeListener('unfollow-completed', handleUnfollowCompleted);
           listenerRemoved = true;
           if (success) {
-            console.log(`✅ Unfollow completion confirmed for ${userId}`);
+            if (loginOptions.DEBUG_MODE) {
+              console.log(`✅ Unfollow completion confirmed for ${userId}`);
+            }
           } else {
             console.log(`❌ Unfollow completion failed for ${userId}`);
           }
@@ -340,7 +336,11 @@ export class FollowerDetector extends EventEmitter {
         clearTimeout(timeout);
         this.eventSystem.removeListener('friends-list-received', handleFriendsListReceived);
         listenerRemoved = true;
-        console.log(`🔄 Friends list updated with ${friends.length} friends`);
+
+        if (loginOptions.DEBUG_MODE) {
+          console.log(`🔄 Friends list updated with ${friends.length} friends`);
+        }
+
         resolve();
       };
 

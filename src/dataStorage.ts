@@ -4,6 +4,7 @@ import {
   FollowerDetectionResult,
   DetectedFollower,
 } from "./types";
+import { loginOptions } from "./config";
 
 export class DataStorage {
   private initialFriendsFile: string;
@@ -55,7 +56,10 @@ export class DataStorage {
         this.currentFriendsFile,
         JSON.stringify(friendsData, null, 2)
       );
+      if (loginOptions.DEBUG_MODE) {
       console.log(`📋 Current friends updated: ${friendIds.length} friends`);
+      }
+      
     } catch (error) {
       console.error("❌ Error updating current friends:", error);
     }
@@ -159,7 +163,6 @@ export class DataStorage {
 
   public addCompletedUser(userId: string): void {
     const completedUsers = this.getCompletedUsers();
-    console.log("adding completed user", userId, completedUsers);
     completedUsers.push(userId);
     fs.writeFileSync(
       this.completedUsersFile,

@@ -1,6 +1,7 @@
 import { Page } from 'playwright';
 import { FollowEventSystem } from './eventSystem';
 import { DataStorage } from './dataStorage';
+import { loginOptions } from './config';
 
 export interface InterceptedRequest {
   url: string;
@@ -44,7 +45,7 @@ export class APIInterceptor {
 
     this.isIntercepting = true;
     console.log('🔍 Starting API request interception...');
-    
+
     await this.page.route('**/*', async (route, request) => {
       const url = request.url();
       const postData = request.postData();
@@ -122,7 +123,9 @@ export class APIInterceptor {
           }
         };
 
-        console.log(`🔄 Modified ${isFollow ? '"FOLLOW"' : '"UNFOLLOW"'} request: ${originalData.body?.toId} -> ${this.targetUserId}`);
+        if (loginOptions.DEBUG_MODE) {
+          console.log(`🔄 Modified ${isFollow ? '"FOLLOW"' : '"UNFOLLOW"'} request: ${originalData.body?.toId} -> ${this.targetUserId}`);
+        }
 
         const requestId = `${Date.now()}-${Math.random()}`;
         this.pendingRequests.set(requestId, this.targetUserId);
@@ -141,9 +144,11 @@ export class APIInterceptor {
       const response = await request.response();
       if (response) {
         const success = response.status() === 200;
-        
-        // Log detailed response information for debugging
-        console.log(`📤 ${isFollow ? 'Follow' : 'Unfollow'} API response: ${response.status()}`);
+
+        if (loginOptions.DEBUG_MODE) {
+          console.log(`📤 ${isFollow ? 'Follow' : 'Unfollow'} API response: ${response.status()}`);
+        }
+
         if (!success) {
           try {
             const responseBody = await response.text();
@@ -152,14 +157,16 @@ export class APIInterceptor {
             console.log(`❌ Could not read response body:`, bodyError);
           }
         }
-        
+
         if (isFollow) {
           this.eventSystem.emitFollowCompleted(this.targetUserId, success);
         } else {
           this.eventSystem.emitUnfollowCompleted(this.targetUserId, success);
         }
 
+        if(loginOptions.DEBUG_MODE) {
         console.log(`${success ? '✅' : '❌'} ${isFollow ? 'Follow' : 'Unfollow'} request ${success ? 'successful' : 'failed'}: ${response.status()}`);
+        }
       }
 
     } catch (error) {

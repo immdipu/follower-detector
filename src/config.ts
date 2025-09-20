@@ -13,4 +13,6 @@ export const loginOptions: LoginOptions = {
   f4tURL: process.env.F4T_URL || "https://free4talk.com",
   accountIdentifier: process.env.ACCOUNT_IDENTIFIER || "immmdeep@gmail.com",
   modelUser: process.env.MODEL_USER || "W̷h̷i̷t̷e̷ W̷o̷l̷f̷",
+  DEBUG_MODE: false,
+
 };

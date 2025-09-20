@@ -24,7 +24,6 @@ export class FollowEventSystem extends EventEmitter {
   }
 
   emitFollowCompleted(userId: string, success: boolean): void {
-    console.log("Emitting follow-completed", { userId, success });
     this.emit('follow-completed', userId, success);
   }
 

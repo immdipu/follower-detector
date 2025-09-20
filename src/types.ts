@@ -45,6 +45,7 @@ export type LoginOptions = {
   f4tURL: string;
   accountIdentifier?: string;
   modelUser?: string;
+  DEBUG_MODE?: boolean;
 };
 
 export type FollowerDetectionResult = {
