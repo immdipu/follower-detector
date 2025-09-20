@@ -30,22 +30,25 @@ EMAIL=your-email@example.com
 PASSWORD=your-password
 ```
 
-### Step 3: Build the tool
-```bash
-npm run build
-```
-
-### Step 4: Run the tool
+### Step 3: Run the tool
 ```bash
 make run
 ```
 
 That's it! The tool will start and begin checking your followers.
 
+## Settings
+
+You can add these optional settings to your `.env` file:
+
+```
+# Turn on detailed logging (shows more information while running)
+DEBUG_MODE=true
+```
+
 ## Easy Commands
 
 - `make run` - Start the follower detector
-- `make build` - Prepare the tool (run this first)
 - `make install` - Get all needed files
 - `make clean` - Remove temporary files
 
@@ -86,8 +89,13 @@ npm test
 npm run build
 ```
 
+## ⚠️ Important Note
+
+This is a **fun learning project** made for educational purposes! We don't intend to harm or overload Free4Talk in any way. Please use it responsibly and respect their terms of service. The tool includes built-in delays to be gentle on their servers.
+
 ## What you need
 
 - A computer with internet
 - Your Free4Talk login info
 - Node.js (download from nodejs.org if you don't have it)
+- **Everything else is included automatically!** (TypeScript, nodemon, and all other tools you need)

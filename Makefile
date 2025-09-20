@@ -2,7 +2,7 @@
 
 # Run the application using Node.js
 run:
-	node dist/index.js
+	npm run start
 
 # Build the TypeScript code
 build:

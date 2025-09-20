@@ -46,10 +46,12 @@ export class FollowerDetector extends EventEmitter {
     });
 
     this.eventSystem.onUnfollowCompleted((userId: string, success: boolean) => {
-      console.log(
-        `${success ? "✅" : "❌"} Unfollow ${success ? "completed" : "failed"
-        } for ${userId}`
-      );
+      if (loginOptions.DEBUG_MODE) {
+        console.log(
+          `${success ? "✅" : "❌"} Unfollow ${success ? "completed" : "failed"
+          } for ${userId}`
+        );
+      }
     });
   }
 
@@ -164,9 +166,9 @@ export class FollowerDetector extends EventEmitter {
 
         if (followSuccess) {
           if (loginOptions.DEBUG_MODE) {
-          console.log(`✅ Follow request completed for ${user.name}`);
+            console.log(`✅ Follow request completed for ${user.name}`);
           }
-          
+
         } else {
           console.log(`❌ Follow request failed for ${user.name}`);
         }
