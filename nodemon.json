@@ -1,0 +1,13 @@
+{
+  "watch": [
+    "src"
+  ],
+  "ext": "ts",
+  "ignore": [
+    "dist/**",
+    "follower-data*.json",
+    "usersInfo.json",
+    "auth.json",
+    "*.csv"
+  ]
+}
