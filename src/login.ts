@@ -9,7 +9,6 @@ export class Login {
   private page: Page | null = null;
   private options: LoginOptions;
   private userDataManager: UserDataManager;
-  private capturedPayload: any = null;
 
   constructor(options: LoginOptions, context: BrowserContext, page: Page) {
     this.options = options;
@@ -221,62 +220,14 @@ export class Login {
         console.log(`📤 Unfollow API response: ${response.status()}`);
       }
     });
-
-    // Also intercept requests to see follow/unfollow attempts and capture _ parameter
-    this.page.on("request", async (request) => {
-      const url = request.url();
-
-      if (
-        url.includes("/identity/post/follow/") ||
-        url.includes("/identity/post/unfollow/")
-      ) {
-        const postData = request.postData();
-
-        try {
-          if (postData) {
-            const data = JSON.parse(postData);
-            const action = url.includes("follow/") ? "follow" : "unfollow";
-
-            console.log(`🔍 ${action} request captured:`, {
-              toId: data.body?.toId,
-              hasToken: !!data.token,
-              hasUnderscore: !!data._,
-            });
-
-            this.capturedPayload = data;
-            console.log("✅ Payload captured and stored");
-          }
-        } catch (error) {
-          console.log(
-            `🔄 ${
-              url.includes("follow/") ? "Follow" : "Unfollow"
-            } request detected:`,
-            url
-          );
-        }
-      }
-    });
   }
 
   public getPage(): Page | null {
     return this.page;
   }
 
-  public getPayloadForUser(userId: string): any {
-    if (!this.capturedPayload) {
-      throw new Error(
-        "No payload captured yet! Please follow someone manually first."
-      );
-    }
 
-    const newPayload = { ...this.capturedPayload };
-    newPayload.body = { ...this.capturedPayload.body, toId: userId };
-    return newPayload;
-  }
 
-  public hasPayload(): boolean {
-    return this.capturedPayload !== null;
-  }
 
   public async close(): Promise<void> {
     try {

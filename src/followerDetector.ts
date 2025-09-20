@@ -7,12 +7,10 @@ import { UIController } from "./uiController";
 import { FollowEventSystem } from "./eventSystem";
 import { APIInterceptor } from "./apiInterceptor";
 import { WindowManager } from "./windowManager";
+import { EventEmitter } from "stream";
 
-export class FollowerDetector {
-  private page: Page;
-  private context: BrowserContext;
+export class FollowerDetector extends EventEmitter {
   private dataStorage: DataStorage;
-  private login: Login;
   private uiController: UIController;
   private eventSystem: FollowEventSystem;
   private apiInterceptor: APIInterceptor;
@@ -27,10 +25,8 @@ export class FollowerDetector {
     login: Login,
     f4tURL: string
   ) {
-    this.page = page;
-    this.context = context;
+    super();
     this.dataStorage = dataStorage;
-    this.login = login;
     this.f4tURL = f4tURL;
     this.uiController = new UIController(page);
     this.eventSystem = new FollowEventSystem();
@@ -51,7 +47,6 @@ export class FollowerDetector {
     // Listen for friends list updates
     this.eventSystem.onFriendsListReceived((friends: string[]) => {
       this.dataStorage.updateCurrentFriends(friends);
-      console.log(`📋 Friends list updated: ${friends.length} friends`);
     });
 
     // Listen for follow completion to trigger friends list refresh
@@ -178,10 +173,9 @@ export class FollowerDetector {
       result.followSuccess = true;
       console.log(`✅ Follow request completed for ${user.name}`);
 
-      // Step 3: Wait a bit for the system to process
-      await waitFor(2);
+      await this.waitForNewFriendsListUpdate();
+      await waitFor(2); // Wait a bit to ensure friends list is updated
 
-      // Step 4: Check current friends list (should be updated via events)
       const currentFriends = this.dataStorage.getCurrentFriends();
       const isNowFriend = currentFriends.includes(user.id);
 
@@ -194,13 +188,11 @@ export class FollowerDetector {
 
       // Step 5: ALWAYS unfollow (critical for staying under 100 follows limit)
       console.log(`👆 Clicking unfollow button for ${user.name}...`);
-
-      // The button should now show "Follow" again, so we click it to unfollow
+    
       APIInterceptor.Action = "unfollow";
       const unfollowClicked = await this.uiController.clickFollowUser();
 
       if (unfollowClicked) {
-        // Wait for unfollow to complete
         await this.waitForUnfollowCompletion(user.id);
         result.unfollowSuccess = true;
         console.log(`✅ Successfully unfollowed ${user.name}`);
@@ -244,9 +236,10 @@ export class FollowerDetector {
       const timeout = setTimeout(() => {
         reject(new Error(`Follow completion timeout for user: ${userId} (${username})`));
       }, 10000); // 10 second timeout
-
+      
       this.eventSystem.onFollowCompleted(
         (completedUserId: string, success: boolean) => {
+          console.log("Debug: onFollowCompleted event received", { completedUserId, success, userId, username });
           if (completedUserId === userId) {
             clearTimeout(timeout);
             if (success) {
@@ -287,14 +280,19 @@ export class FollowerDetector {
 
   private waitForNewFriendsListUpdate(): Promise<void> {
     return new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        const currentFriends = this.dataStorage.getCurrentFriends();
-        if (currentFriends.length > 0) {
-          clearInterval(checkInterval);
-          resolve();
-        }
-      }, 1000); // Check every second
+      const timeout= setTimeout(()=>{
+        console.log("⚠️ Friends list update timeout");
+        resolve();
+      }, 8000); // 8 second timeout
+
+      this.eventSystem.onFriendsListReceived((friends: string[]) => {
+        clearTimeout(timeout);
+        resolve();
+      });
     });
+
+  
+
   }
 
 
@@ -325,25 +323,5 @@ export class FollowerDetector {
     await this.windowManager.closeAllWindows();
 
     console.log("✅ Follower detection stopped and resources cleaned up");
-  }
-
-  /**
-   * Get detection status
-   */
-  public getStatus(): {
-    running: boolean;
-    hasPayload: boolean;
-    intercepting: boolean;
-    windowCount: number;
-    hasFriendsWindow: boolean;
-  } {
-    const interceptorStatus = this.apiInterceptor.getStatus();
-    return {
-      running: this.isRunning,
-      hasPayload: this.login.hasPayload(),
-      intercepting: interceptorStatus.intercepting,
-      windowCount: this.windowManager.getWindowCount(),
-      hasFriendsWindow: this.windowManager.hasFriendsListWindow(),
-    };
   }
 }
