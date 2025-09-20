@@ -1,4 +1,4 @@
-import { Page, BrowserContext } from 'playwright';
+import { Page } from 'playwright';
 import { FollowEventSystem } from './eventSystem';
 import { DataStorage } from './dataStorage';
 
@@ -17,7 +17,6 @@ export interface InterceptedResponse {
 
 export class APIInterceptor {
   private page: Page;
-  private context: BrowserContext;
   private eventSystem: FollowEventSystem;
   private isIntercepting: boolean = false;
   private targetUserId: string | null = null;
@@ -26,9 +25,8 @@ export class APIInterceptor {
   private dataStorage: DataStorage;
   public static Action: "follow" | "unfollow";
 
-  constructor(page: Page, context: BrowserContext, eventSystem: FollowEventSystem, dataStorage: DataStorage) {
+  constructor(page: Page, eventSystem: FollowEventSystem, dataStorage: DataStorage) {
     this.page = page;
-    this.context = context;
     this.eventSystem = eventSystem;
     this.initialFriends = false;
     this.dataStorage = dataStorage;
@@ -46,8 +44,7 @@ export class APIInterceptor {
 
     this.isIntercepting = true;
     console.log('🔍 Starting API request interception...');
-
-    // Intercept requests
+    
     await this.page.route('**/*', async (route, request) => {
       const url = request.url();
       const postData = request.postData();
@@ -87,7 +84,6 @@ export class APIInterceptor {
    */
   public setTargetUserId(userId: string): void {
     this.targetUserId = userId;
-    console.log(`🎯 Target user ID set to: ${userId}`);
   }
 
 
@@ -208,7 +204,6 @@ export class APIInterceptor {
    */
   public clearTargetUserId(): void {
     this.targetUserId = null;
-    console.log('🧹 Target user ID cleared');
   }
 
 

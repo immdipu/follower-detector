@@ -30,7 +30,6 @@ export class FollowerDetector extends EventEmitter {
     this.eventSystem = new FollowEventSystem();
     this.apiInterceptor = new APIInterceptor(
       page,
-      context,
       this.eventSystem,
       this.dataStorage
     );
