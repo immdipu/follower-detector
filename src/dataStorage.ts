@@ -172,7 +172,7 @@ export class DataStorage {
       if (fs.existsSync(this.completedUsersFile)) {
         const fileContent = fs.readFileSync(this.completedUsersFile, "utf-8");
         const data = JSON.parse(fileContent);
-        return data.users || [];
+        return data || [];
       }
     } catch (error) {
       console.error("❌ Error loading completed users:", error);
@@ -182,6 +182,7 @@ export class DataStorage {
 
   public addCompletedUser(userId: string): void {
     const completedUsers = this.getCompletedUsers();
+    console.log("adding completed user", userId, completedUsers);
     completedUsers.push(userId);
     fs.writeFileSync(
       this.completedUsersFile,

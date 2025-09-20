@@ -128,14 +128,6 @@ export class APIInterceptor {
 
         console.log(`🔄 Modified ${isFollow ? '"FOLLOW"' : '"UNFOLLOW"'} request: ${originalData.body?.toId} -> ${this.targetUserId}`);
 
-        // Emit event
-        // if (isFollow) {
-        //   this.eventSystem.emitFollowRequested(this.targetUserId);
-        // } else {
-        //   const newURL = this.convertFollowToUnfollowUrl(url);
-        //   url = newURL;
-        // }
-
         const requestId = `${Date.now()}-${Math.random()}`;
         this.pendingRequests.set(requestId, this.targetUserId);
       }
@@ -153,6 +145,18 @@ export class APIInterceptor {
       const response = await request.response();
       if (response) {
         const success = response.status() === 200;
+        
+        // Log detailed response information for debugging
+        console.log(`📤 ${isFollow ? 'Follow' : 'Unfollow'} API response: ${response.status()}`);
+        if (!success) {
+          try {
+            const responseBody = await response.text();
+            console.log(`📋 Response body:`, responseBody);
+          } catch (bodyError) {
+            console.log(`❌ Could not read response body:`, bodyError);
+          }
+        }
+        
         if (isFollow) {
           this.eventSystem.emitFollowCompleted(this.targetUserId, success);
         } else {
