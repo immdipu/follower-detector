@@ -65,12 +65,20 @@ export class FollowEventSystem extends EventEmitter {
     this.on('follow-completed', callback);
   }
 
+  onFollowCompletedOnce(callback: (userId: string, success: boolean) => void): void {
+    this.once('follow-completed', callback);
+  }
+
   onUnfollowRequested(callback: (userId: string) => void): void {
     this.on('unfollow-requested', callback);
   }
 
   onUnfollowCompleted(callback: (userId: string, success: boolean) => void): void {
     this.on('unfollow-completed', callback);
+  }
+
+  onUnfollowCompletedOnce(callback: (userId: string, success: boolean) => void): void {
+    this.once('unfollow-completed', callback);
   }
 
   onFriendsListRequested(callback: () => void): void {

@@ -48,14 +48,6 @@ export class FollowerDetector extends EventEmitter {
     this.eventSystem.onFriendsListReceived((friends: string[]) => {
       this.dataStorage.updateCurrentFriends(friends);
     });
-
-    // Listen for follow completion to trigger friends list refresh
-    // this.eventSystem.onFollowCompleted(async (userId: string, success: boolean) => {
-    //   if (success) {
-    //     await this.refreshFriendsList();
-    //   }
-    // });
-
     // Listen for unfollow completion
     this.eventSystem.onUnfollowCompleted((userId: string, success: boolean) => {
       console.log(
@@ -94,9 +86,8 @@ export class FollowerDetector extends EventEmitter {
         continue;
       }
 
-      // Skip if it's an initial friend (don't want to unfollow real friends)
       if (this.dataStorage.isInitialFriend(user.id)) {
-        console.log("⏭️ Skipping initial friend");
+        console.log(`⏭️ Skipping initial friend ${user.name}`);
         continue;
       }
 
@@ -108,7 +99,7 @@ export class FollowerDetector extends EventEmitter {
 
       try {
         await this.checkIfFollowsBack(user);
-
+  
         // Wait between requests to avoid rate limiting
         if (i < users.length - 1) {
           console.log("⏳ Waiting before next user...");
@@ -162,10 +153,9 @@ export class FollowerDetector extends EventEmitter {
     try {
       // Step 1: Set target user ID for interception
       this.apiInterceptor.setTargetUserId(user.id);
-
       // Step 2: Set up event listener BEFORE making the request
       const followPromise = this.waitForFollowCompletion(user.id, user.name);
-
+      const friendsListUpdatePromise = this.waitForNewFriendsListUpdate();
       // Step 3: Click follow button (will be intercepted and modified)
       console.log(`👆 Clicking follow button for ${user.name}...`);
       const followClicked = await this.uiController.clickFollowUser();
@@ -180,7 +170,7 @@ export class FollowerDetector extends EventEmitter {
       result.followSuccess = true;
       console.log(`✅ Follow request completed for ${user.name}`);
 
-      await this.waitForNewFriendsListUpdate();
+      await friendsListUpdatePromise;
       await waitFor(2); // Wait a bit to ensure friends list is updated
 
       const currentFriends = this.dataStorage.getCurrentFriends();
@@ -245,7 +235,14 @@ export class FollowerDetector extends EventEmitter {
       `🔄 Setting up follow completion listener for ${userId} (${username})`
     );
     return new Promise((resolve, reject) => {
+      let listenerRemoved = false;
+      
       const timeout = setTimeout(() => {
+        if (!listenerRemoved) {
+          // Remove the listener to prevent memory leaks
+          this.eventSystem.removeAllListeners('follow-completed');
+          listenerRemoved = true;
+        }
         reject(
           new Error(
             `Follow completion timeout for user: ${userId} (${username})`
@@ -253,29 +250,33 @@ export class FollowerDetector extends EventEmitter {
         );
       }, 10000); // 10 second timeout
 
-      this.eventSystem.onFollowCompleted(
-        (completedUserId: string, success: boolean) => {
-          console.log("🎯 Follow completion event received", {
-            completedUserId,
-            success,
-            userId,
-            username,
-          });
-          if (completedUserId === userId) {
-            clearTimeout(timeout);
-            if (success) {
-              console.log(
-                `✅ Follow completion confirmed for ${userId} (${username})`
-              );
-              resolve();
-            } else {
-              reject(
-                new Error(`Follow failed for user ${userId} (${username})`)
-              );
-            }
+      const handleFollowCompleted = (completedUserId: string, success: boolean) => {
+        console.log("🎯 Follow completion event received", {
+          completedUserId,
+          success,
+          userId,
+          username,
+        });
+        if (completedUserId === userId && !listenerRemoved) {
+          clearTimeout(timeout);
+          // Remove the listener immediately after use
+          this.eventSystem.removeListener('follow-completed', handleFollowCompleted);
+          listenerRemoved = true;
+          
+          if (success) {
+            console.log(
+              `✅ Follow completion confirmed for ${userId} (${username})`
+            );
+            resolve();
+          } else {
+            reject(
+              new Error(`Follow failed for user ${userId} (${username})`)
+            );
           }
         }
-      );
+      };
+
+      this.eventSystem.onFollowCompleted(handleFollowCompleted);
     });
   }
 
@@ -283,62 +284,57 @@ export class FollowerDetector extends EventEmitter {
    * Wait for unfollow completion event
    */
   private async waitForUnfollowCompletion(userId: string): Promise<void> {
-    console.log(`🔄 Setting up unfollow completion listener for ${userId}`);
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error(`Unfollow completion timeout for user ${userId}`));
-      }, 10000); // 10 second timeout
+      let listenerRemoved = false;
 
-      this.eventSystem.onUnfollowCompleted(
-        (completedUserId: string, success: boolean) => {
-          console.log("🎯 Unfollow completion event received", {
-            completedUserId,
-            success,
-            userId,
-          });
-          if (completedUserId === userId) {
-            clearTimeout(timeout);
-            if (success) {
-              console.log(`✅ Unfollow completion confirmed for ${userId}`);
-              resolve();
-            } else {
-              reject(new Error(`Unfollow failed for user ${userId}`));
-            }
+      const timeout = setTimeout(() => {
+        if (!listenerRemoved) {
+          this.eventSystem.removeAllListeners('unfollow-completed');
+          listenerRemoved = true;
+        }
+        reject(new Error(`Unfollow completion timeout for user ${userId}`));
+      }, 10000); 
+
+      const handleUnfollowCompleted = (completedUserId: string, success: boolean) => {
+        if (completedUserId === userId && !listenerRemoved) {
+          clearTimeout(timeout);
+          this.eventSystem.removeListener('unfollow-completed', handleUnfollowCompleted);
+          listenerRemoved = true;
+          if (success) {
+            console.log(`✅ Unfollow completion confirmed for ${userId}`);
+            resolve();
+          } else {
+            reject(new Error(`Unfollow failed for user ${userId}`));
           }
         }
-      );
+      };
+
+      this.eventSystem.onUnfollowCompleted(handleUnfollowCompleted);
     });
   }
 
   private waitForNewFriendsListUpdate(): Promise<void> {
     return new Promise((resolve) => {
+      let listenerRemoved = false;
       const timeout = setTimeout(() => {
-        console.log("⚠️ Friends list update timeout");
+        if (!listenerRemoved) {
+          this.eventSystem.removeAllListeners('friends-list-received');
+          listenerRemoved = true;
+        }
         resolve();
-      }, 8000); // 8 second timeout
+      }, 8000);
 
-      this.eventSystem.onFriendsListReceived((friends: string[]) => {
+      const handleFriendsListReceived = (friends: string[]) => {
         clearTimeout(timeout);
+        this.eventSystem.removeListener('friends-list-received', handleFriendsListReceived);
+        listenerRemoved = true;
         resolve();
-      });
+      };
+
+      this.eventSystem.onFriendsListReceived(handleFriendsListReceived);
     });
   }
 
-  /**
-   * Refresh friends list by reloading the friends list window
-   */
-  private async refreshFriendsList(): Promise<void> {
-    try {
-      if (!this.windowManager.hasFriendsListWindow()) {
-        await this.windowManager.openFriendsListWindow(this.f4tURL);
-      }
-
-      await this.windowManager.reloadFriendsListWindow();
-      console.log("✅ Friends list refreshed");
-    } catch (error) {
-      console.error("❌ Error refreshing friends list:", error);
-    }
-  }
 
   public async stop(): Promise<void> {
     this.isRunning = false;
@@ -347,7 +343,6 @@ export class FollowerDetector extends EventEmitter {
     // Stop API interception
     await this.apiInterceptor.stopIntercepting();
 
-    // Close all windows
     await this.windowManager.closeAllWindows();
 
     console.log("✅ Follower detection stopped and resources cleaned up");

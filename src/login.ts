@@ -210,15 +210,6 @@ export class Login {
         const roomsInfo = data.data;
         await this.userDataManager.writeUserData(roomsInfo);
       }
-
-      // Log follow/unfollow API responses
-      if (mainURL.includes("/identity/post/follow/")) {
-        console.log(`📤 Follow API response: ${response.status()}`);
-      }
-
-      if (mainURL.includes("/identity/post/unfollow/")) {
-        console.log(`📤 Unfollow API response: ${response.status()}`);
-      }
     });
   }
 
