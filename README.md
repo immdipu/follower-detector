@@ -98,4 +98,3 @@ This is a **fun learning project** made for educational purposes! We don't inten
 - A computer with internet
 - Your Free4Talk login info
 - Node.js (download from nodejs.org if you don't have it)
-- **Everything else is included automatically!** (TypeScript, nodemon, and all other tools you need)
