@@ -1,282 +1,223 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { FriendsData, FollowerDetectionResult, Participant, FailedUnfollowUser, DetectedFollower } from './types';
+import * as fs from "fs";
+import * as path from "path";
+import {
+  FollowerDetectionResult,
+  Participant,
+  FailedUnfollowUser,
+  DetectedFollower,
+} from "./types";
 
 export class DataStorage {
-  private dataFile: string;
-  private data: FriendsData;
+  private baseFileName: string;
+  private initialFriendsFile: string;
+  private currentFriendsFile: string;
+  private followersFile: string;
+  private completedUsersFile: string;
 
-  constructor(dataFile: string = './follower-data.json') {
-    this.dataFile = path.resolve(dataFile);
-    this.data = this.loadData();
+  constructor(baseFileName: string = "follower-data") {
+    this.baseFileName = baseFileName;
+    this.initialFriendsFile = path.resolve(
+      `./${baseFileName}-initial-friends.json`
+    );
+    this.currentFriendsFile = path.resolve(`./${baseFileName}-friends.json`);
+    this.followersFile = path.resolve(`./${baseFileName}-followers.json`);
+    this.completedUsersFile = path.resolve(`./completed-users.json`);
+  }
+
+  public setInitialFriends(friendIds: string[]): void {
+    try {
+      const initialFriendsData = {
+        timestamp: new Date().toISOString(),
+        count: friendIds.length,
+        friends: friendIds,
+        note: "Initial friends list - these users should NOT be unfollowed",
+      };
+
+      fs.writeFileSync(
+        this.initialFriendsFile,
+        JSON.stringify(initialFriendsData, null, 2)
+      );
+      console.log(`📝 Initial friends saved: ${friendIds.length} friends`);
+      this.updateCurrentFriends(friendIds);
+    } catch (error) {
+      console.error("❌ Error saving initial friends:", error);
+    }
   }
 
   /**
-   * Load data from file or create default structure
+   * Update current friends list (updates frequently)
    */
-  private loadData(): FriendsData {
+  public updateCurrentFriends(friendIds: string[]): void {
     try {
-      if (fs.existsSync(this.dataFile)) {
-        const fileContent = fs.readFileSync(this.dataFile, 'utf-8');
+      const friendsData = {
+        timestamp: new Date().toISOString(),
+        count: friendIds.length,
+        friends: friendIds,
+      };
+
+      fs.writeFileSync(
+        this.currentFriendsFile,
+        JSON.stringify(friendsData, null, 2)
+      );
+      console.log(`📋 Current friends updated: ${friendIds.length} friends`);
+    } catch (error) {
+      console.error("❌ Error updating current friends:", error);
+    }
+  }
+
+  /**
+   * Add detected follower (only save if they follow back)
+   */
+  public addDetectedFollower(result: FollowerDetectionResult): void {
+    // Only save followers who actually follow back
+    if (result.followsYouBack) {
+      try {
+        let followers: DetectedFollower[] = [];
+
+        // Load existing followers
+        if (fs.existsSync(this.followersFile)) {
+          const fileContent = fs.readFileSync(this.followersFile, "utf-8");
+          followers = JSON.parse(fileContent);
+        }
+
+        // Check if already exists
+        const exists = followers.some((f) => f.userId === result.userId);
+        if (!exists) {
+          const follower: DetectedFollower = {
+            userId: result.userId,
+            username: result.username,
+            avatar: result.avatar,
+            followers: result.followers,
+            following: result.following,
+            friends: result.friends,
+            supporter: result.supporter,
+            isVerified: result.isVerified,
+            detectedAt: result.timestamp,
+          };
+
+          followers.push(follower);
+          fs.writeFileSync(
+            this.followersFile,
+            JSON.stringify(followers, null, 2)
+          );
+          console.log(`🎉 New follower detected: ${result.username}`);
+        } else {
+          console.log(`⚠️ Follower already exists: ${result.username}`);
+        }
+      } catch (error) {
+        console.error("❌ Error saving detected follower:", error);
+      }
+    } else {
+      console.log(`❌ ${result.username} does not follow back - not saved`);
+    }
+  }
+
+  /**
+   * Add failed unfollow user (for debugging purposes)
+   */
+  public addFailedUnfollow(user: FailedUnfollowUser): void {
+    console.log(`⚠️ Failed unfollow: ${user.username} - ${user.error}`);
+    // We could save this to a separate file if needed, but keeping it simple for now
+  }
+
+  /**
+   * Get all detected followers (who follow back)
+   */
+  public getDetectedFollowers(): DetectedFollower[] {
+    try {
+      if (fs.existsSync(this.followersFile)) {
+        const fileContent = fs.readFileSync(this.followersFile, "utf-8");
         return JSON.parse(fileContent);
       }
     } catch (error) {
-      console.error('❌ Error loading data file:', error);
+      console.error("❌ Error loading followers:", error);
     }
-
-    // Return default structure
-    return {
-      initialFriends: [],
-      currentFriends: [],
-      detectedFollowers: [],
-      failedUnfollows: []
-    };
-  }
-
-  /**
-   * Save data to file
-   */
-  private saveData(): void {
-    try {
-      fs.writeFileSync(this.dataFile, JSON.stringify(this.data, null, 2));
-      console.log('💾 Data saved successfully');
-    } catch (error) {
-      console.error('❌ Error saving data:', error);
-    }
-  }
-
-  /**
-   * Store initial friends list (to avoid unfollowing real friends)
-   */
-  public setInitialFriends(friendIds: string[]): void {
-    this.data.initialFriends = [...friendIds];
-    this.data.currentFriends = [...friendIds];
-    this.saveData();
-    console.log(`📝 Initial friends stored: ${friendIds.length} friends`);
-  }
-
-  /**
-   * Update current friends list
-   */
-  public updateCurrentFriends(friendIds: string[]): void {
-    this.data.currentFriends = [...friendIds];
-    this.saveData();
-  }
-
-  /**
-   * Add detected follower
-   */
-  public addDetectedFollower(result: FollowerDetectionResult): void {
-    // Check if already exists
-    const exists = this.data.detectedFollowers.some(
-      follower => follower.userId === result.userId
-    );
-
-    if (!exists) {
-      this.data.detectedFollowers.push(result);
-      this.saveData();
-      console.log(`✅ Added detected follower: ${result.username}`);
-      
-      // If they follow back, save to separate followers file
-      if (result.followsYouBack) {
-        this.saveDetectedFollower(result);
-      }
-    } else {
-      console.log(`⚠️ Follower already detected: ${result.username}`);
-    }
-  }
-
-  /**
-   * Add failed unfollow user
-   */
-  public addFailedUnfollow(user: FailedUnfollowUser): void {
-    const exists = this.data.failedUnfollows.some(
-      failed => failed.userId === user.userId
-    );
-
-    if (!exists) {
-      this.data.failedUnfollows.push(user);
-      this.saveData();
-      console.log(`⚠️ Added failed unfollow: ${user.username} - ${user.error}`);
-    }
-  }
-
-  /**
-   * Save detected follower to separate file with full data
-   */
-  private saveDetectedFollower(result: FollowerDetectionResult): void {
-    const followersFile = this.dataFile.replace('.json', '-followers.json');
-    
-    const follower: DetectedFollower = {
-      userId: result.userId,
-      username: result.username,
-      avatar: result.avatar,
-      followers: result.followers,
-      following: result.following,
-      friends: result.friends,
-      supporter: result.supporter,
-      isVerified: result.isVerified,
-      detectedAt: result.timestamp
-    };
-
-    try {
-      let followers: DetectedFollower[] = [];
-      
-      // Load existing followers
-      if (fs.existsSync(followersFile)) {
-        const fileContent = fs.readFileSync(followersFile, 'utf-8');
-        followers = JSON.parse(fileContent);
-      }
-
-      // Check if already exists
-      const exists = followers.some(f => f.userId === follower.userId);
-      if (!exists) {
-        followers.push(follower);
-        fs.writeFileSync(followersFile, JSON.stringify(followers, null, 2));
-        console.log(`🎉 Saved follower to ${followersFile}: ${follower.username}`);
-      }
-    } catch (error) {
-      console.error('❌ Error saving detected follower:', error);
-    }
-  }
-
-  /**
-   * Get all detected followers
-   */
-  public getDetectedFollowers(): FollowerDetectionResult[] {
-    return [...this.data.detectedFollowers];
-  }
-
-  /**
-   * Get failed unfollows
-   */
-  public getFailedUnfollows(): FailedUnfollowUser[] {
-    return [...this.data.failedUnfollows];
+    return [];
   }
 
   /**
    * Get initial friends (to avoid unfollowing them)
    */
   public getInitialFriends(): string[] {
-    return [...this.data.initialFriends];
+    try {
+      if (fs.existsSync(this.initialFriendsFile)) {
+        const fileContent = fs.readFileSync(this.initialFriendsFile, "utf-8");
+        const data = JSON.parse(fileContent);
+        return data.friends || [];
+      }
+    } catch (error) {
+      console.error("❌ Error loading initial friends:", error);
+    }
+    return [];
   }
 
   /**
    * Get current friends
    */
   public getCurrentFriends(): string[] {
-    return [...this.data.currentFriends];
+    try {
+      if (fs.existsSync(this.currentFriendsFile)) {
+        const fileContent = fs.readFileSync(this.currentFriendsFile, "utf-8");
+        const data = JSON.parse(fileContent);
+        return data.friends || [];
+      }
+    } catch (error) {
+      console.error("❌ Error loading current friends:", error);
+    }
+    return [];
+  }
+
+  public getCompletedUsers(): string[] {
+    try {
+      if (fs.existsSync(this.completedUsersFile)) {
+        const fileContent = fs.readFileSync(this.completedUsersFile, "utf-8");
+        const data = JSON.parse(fileContent);
+        return data.users || [];
+      }
+    } catch (error) {
+      console.error("❌ Error loading completed users:", error);
+    }
+    return [];
+  }
+
+  public addCompletedUser(userId: string): void {
+    const completedUsers = this.getCompletedUsers();
+    completedUsers.push(userId);
+    fs.writeFileSync(
+      this.completedUsersFile,
+      JSON.stringify(completedUsers, null, 2)
+    );
+  }
+
+  public isCompletedUser(userId: string): boolean {
+    const completedUsers = this.getCompletedUsers();
+    return completedUsers.includes(userId);
   }
 
   /**
    * Check if user is an initial friend (should not be unfollowed)
    */
   public isInitialFriend(userId: string): boolean {
-    return this.data.initialFriends.includes(userId);
+    const initialFriends = this.getInitialFriends();
+    return initialFriends.includes(userId);
   }
 
   /**
-   * Get new friends (not in initial list)
+   * Get summary of detected followers
    */
-  public getNewFriends(): string[] {
-    return this.data.currentFriends.filter(
-      friendId => !this.data.initialFriends.includes(friendId)
-    );
-  }
+  public getSummary(): {
+    totalFollowers: number;
+    initialFriends: number;
+    currentFriends: number;
+  } {
+    const followers = this.getDetectedFollowers();
+    const initialFriends = this.getInitialFriends();
+    const currentFriends = this.getCurrentFriends();
 
-  /**
-   * Store user data for later reference
-   */
-  public storeUserData(users: Participant[]): void {
-    const userDataFile = this.dataFile.replace('.json', '-users.json');
-    
-    try {
-      fs.writeFileSync(userDataFile, JSON.stringify(users, null, 2));
-      console.log(`👥 Stored ${users.length} user records`);
-    } catch (error) {
-      console.error('❌ Error storing user data:', error);
-    }
-  }
-
-  /**
-   * Get stored user data
-   */
-  public getStoredUsers(): Participant[] {
-    const userDataFile = this.dataFile.replace('.json', '-users.json');
-    
-    try {
-      if (fs.existsSync(userDataFile)) {
-        const fileContent = fs.readFileSync(userDataFile, 'utf-8');
-        return JSON.parse(fileContent);
-      }
-    } catch (error) {
-      console.error('❌ Error loading user data:', error);
-    }
-
-    return [];
-  }
-
-  /**
-   * Find user by ID in stored data
-   */
-  public findUser(userId: string): Participant | null {
-    const users = this.getStoredUsers();
-    return users.find(user => user.id === userId) || null;
-  }
-
-  /**
-   * Export results to a readable format
-   */
-  public exportResults(): void {
-    const followersWhoFollowBack = this.data.detectedFollowers.filter(f => f.followsYouBack);
-    const failedUnfollows = this.data.failedUnfollows;
-    
-    const results = {
-      summary: {
-        totalTested: this.data.detectedFollowers.length,
-        followersWhoFollowBack: followersWhoFollowBack.length,
-        failedUnfollows: failedUnfollows.length,
-        initialFriends: this.data.initialFriends.length,
-        currentFriends: this.data.currentFriends.length,
-        newFriends: this.getNewFriends().length
-      },
-      followersWhoFollowBack: followersWhoFollowBack.map(follower => ({
-        username: follower.username,
-        followers: follower.followers,
-        friends: follower.friends,
-        isVerified: follower.isVerified || false,
-        followSuccess: follower.followSuccess,
-        unfollowSuccess: follower.unfollowSuccess,
-        timestamp: new Date(follower.timestamp).toLocaleString()
-      })),
-      failedUnfollows: failedUnfollows.map(failed => ({
-        username: failed.username,
-        followers: failed.followers,
-        friends: failed.friends,
-        error: failed.error,
-        timestamp: new Date(failed.timestamp).toLocaleString()
-      })),
-      allResults: this.data.detectedFollowers.map(follower => ({
-        username: follower.username,
-        followsBack: follower.followsYouBack,
-        followSuccess: follower.followSuccess,
-        unfollowSuccess: follower.unfollowSuccess,
-        followers: follower.followers,
-        timestamp: new Date(follower.timestamp).toLocaleString()
-      }))
+    return {
+      totalFollowers: followers.length,
+      initialFriends: initialFriends.length,
+      currentFriends: currentFriends.length,
     };
-
-    const exportFile = this.dataFile.replace('.json', '-results.json');
-    
-    try {
-      fs.writeFileSync(exportFile, JSON.stringify(results, null, 2));
-      console.log(`📊 Results exported to: ${exportFile}`);
-      console.log(`🎉 Found ${followersWhoFollowBack.length} users who follow you back!`);
-      if (failedUnfollows.length > 0) {
-        console.log(`⚠️ WARNING: ${failedUnfollows.length} failed unfollows - check results file!`);
-      }
-    } catch (error) {
-      console.error('❌ Error exporting results:', error);
-    }
   }
 }

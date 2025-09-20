@@ -14,20 +14,28 @@ dotenv.config();
 async function main() {
   const { browser, context, page } = await initBrowser(loginOptions);
   const login = new Login(loginOptions, context, page);
+  const dataStorage = new DataStorage();
+  const followerDetector = new FollowerDetector(page, context, dataStorage, login, loginOptions.f4tURL);
   const uiController = new UIController(page);
+  const userDataManager = new UserDataManager();
 
   try {
     console.log('🚀 Starting Free4Talk Follower Detector...');
     console.log('🔐 Starting login process...');
     await login.performLogin();
     console.log('✅ Login successful!');
-    waitFor(4);
+    await followerDetector.initialize();
+    await waitFor(4);
     await uiController.openUserProfile(loginOptions.modelUser || "");
-    waitFor(4);
-    await uiController.clickFollowUser();
-  
-
+    await waitFor(4);
+    const users = await userDataManager.readUserData();
+    await followerDetector.detectFollowers(users);
+    
+    console.log('\n🎯 System initialized with intercept-based approach!');
+    console.log('🔍 API requests are being intercepted and can be modified');
+    console.log('🪟 Separate window opened for friends list monitoring');
     console.log('\n🌐 Browser is open. Press Ctrl+C to exit...');
+    
     process.stdin.setRawMode(true);
     process.stdin.resume();
     process.stdin.on('data', () => {
@@ -38,13 +46,13 @@ async function main() {
     console.error('❌ Error:', error);
   } finally {
     process.on('exit', async () => {
+      await followerDetector.stop();
       await login.close();
       await closeBrowser(browser as Browser);
     });
   }
 }
 
-// Export classes for use in other files
 export { Login, FollowerDetector, DataStorage, UserDataManager };
 
 // Run if this file is executed directly
