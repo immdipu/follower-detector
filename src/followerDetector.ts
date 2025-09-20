@@ -6,7 +6,6 @@ import { Login } from "./login";
 import { UIController } from "./uiController";
 import { FollowEventSystem } from "./eventSystem";
 import { APIInterceptor } from "./apiInterceptor";
-import { WindowManager } from "./windowManager";
 import { EventEmitter } from "stream";
 
 export class FollowerDetector extends EventEmitter {
@@ -14,7 +13,6 @@ export class FollowerDetector extends EventEmitter {
   private uiController: UIController;
   private eventSystem: FollowEventSystem;
   private apiInterceptor: APIInterceptor;
-  private windowManager: WindowManager;
   private isRunning: boolean = false;
   private f4tURL: string;
 
@@ -36,7 +34,6 @@ export class FollowerDetector extends EventEmitter {
       this.eventSystem,
       this.dataStorage
     );
-    this.windowManager = new WindowManager(context, this.eventSystem);
     this.setupEventListeners();
   }
 
@@ -359,8 +356,6 @@ export class FollowerDetector extends EventEmitter {
 
     // Stop API interception
     await this.apiInterceptor.stopIntercepting();
-
-    await this.windowManager.closeAllWindows();
 
     console.log("✅ Follower detection stopped and resources cleaned up");
   }

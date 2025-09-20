@@ -131,32 +131,6 @@ export class UserDataManager {
   }
 
   /**
-   * Get users with specific criteria
-   */
-  public getUsersWithCriteria(criteria: {
-    minFollowers?: number;
-    maxFollowers?: number;
-    minFriends?: number;
-    maxFriends?: number;
-    excludeVerified?: boolean;
-  }): Participant[] {
-    const users = this.getUsers();
-    
-    return users.filter(user => {
-      if (criteria.minFollowers !== undefined && user.followers < criteria.minFollowers) return false;
-      if (criteria.maxFollowers !== undefined && user.followers > criteria.maxFollowers) return false;
-      if (criteria.minFriends !== undefined && user.friends < criteria.minFriends) return false;
-      if (criteria.maxFriends !== undefined && user.friends > criteria.maxFriends) return false;
-      if (criteria.excludeVerified && user.isVerified) return false;
-      
-      return true;
-    });
-  }
-
-
- 
-
-  /**
    * Export users to different format for analysis
    */
   public exportUsers(format: 'csv' | 'json' = 'json'): void {
